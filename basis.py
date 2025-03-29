@@ -54,7 +54,7 @@ class Linear2DFunction:
             np.ndarray: The gradient matrix (shape: Mx3x2).
         """
         gradient_matrix = vertices[:, [2, 0, 1], :] - vertices[:, [1, 2, 0], :]
-        return gradient_matrix
+        return gradient_matrix/(2*areas[:,None, None])
 
     def _element_areas(self, vertices: np.ndarray, indices: np.ndarray) -> np.ndarray:
         """
@@ -177,13 +177,13 @@ class Linear2DFunction:
 
         f_values = f(nodes[:, 0], nodes[:, 1])
 
-
         load_vector = np.zeros(num_nodes)
-        np.add.at(load_vector, elements[:, 0], f_values[elements[:, 0]]*areas )
-        np.add.at(load_vector, elements[:, 1], f_values[elements[:, 1]]*areas)
-        np.add.at(load_vector, elements[:, 2], f_values[elements[:, 2]]*areas)
+        np.add.at(load_vector, elements[:, 0], (1/3)*f_values[elements[:, 0]] * areas)
+        np.add.at(load_vector, elements[:, 1], (1/3)*f_values[elements[:, 1]] * areas)
+        np.add.at(load_vector, elements[:, 2], (1/3)*f_values[elements[:, 2]] * areas)
 
         return load_vector
+
 
     def apply_boundary_conditions(self, free_stiffness: sparse.csr_matrix, free_load: np.ndarray, mesh: 'Mesh', mode: str = 'dirichlet') -> tuple:
         """
