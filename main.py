@@ -18,6 +18,7 @@ class Mesh:
         self.numel = len(elements)
         self.numnd = len(nodes)
         self.boundary_nodes = self.find_boundary_nodes()
+        self.vertices = self.nodes[self.elements]
         return
     def visualise2D(self):
         fig = plt.figure()
@@ -65,7 +66,7 @@ class Mesh:
         for edge in boundary_edges:
             boundary_nodes.update(edge)
 
-        return boundary_nodes
+        return list(boundary_nodes)
 
 
 
@@ -141,15 +142,17 @@ class Linear2DFunction:
         return gradient_matrix
 
 
-    def _compute_local_stiffnesses(self, mesh, indices):
-        vertices = mesh.nodes[mesh.elements]
+    def _element_areas(self,vertices, indices):
         areas = 0.5 * np.abs(
-                        (vertices[indices, 0, 0] - vertices[indices, 2, 0])*
-                        (vertices[indices, 1, 1] - vertices[indices, 0, 1])-
-                        (vertices[indices, 0, 0] - vertices[indices, 1, 0]) *
-                        (vertices[indices, 2, 1] - vertices[indices, 0, 1]))
+            (vertices[indices, 0, 0] - vertices[indices, 2, 0]) *
+            (vertices[indices, 1, 1] - vertices[indices, 0, 1]) -
+            (vertices[indices, 0, 0] - vertices[indices, 1, 0]) *
+            (vertices[indices, 2, 1] - vertices[indices, 0, 1]))
+        return areas
 
-        gradients = self._gradients(vertices, areas)
+    def _compute_local_stiffnesses(self, mesh, areas):
+
+        gradients = self._gradients(mesh.vertices, areas)
 
         local_stiffnesses = np.einsum("nij,nkj->nik", gradients, gradients) * areas[:, None, None]
         return local_stiffnesses
@@ -163,21 +166,36 @@ class Linear2DFunction:
         :param boundary_nodes: List of node indices with Dirichlet boundary conditions.
         :param value: The prescribed value at the boundary (default: 0.0).
         """
-        for node in boundary_nodes:
-            # Modify stiffness matrix: Set row and column to 0, except diagonal
-            K[node, :] = 0
-            K[:, node] = 0
-            K[node, node] = 1  # Ensure diagonal is 1 for u = value (Dirichlet)
+        # Ensure boundary_nodes is a numpy array (convert from set if needed)
+        boundary_nodes = np.asarray(boundary_nodes).flatten()  # Convert to array and flatten
 
-            # Modify load vector: Set the boundary node's load to the prescribed value
-            F[node] = value
+        # Step 1: Convert K to CSR format if it's not already
+        if not isinstance(K, sparse.csr_matrix):
+            K = K.tocsr()  # Convert COO to CSR format for efficient operations
 
+        # Step 2: Create a mask for rows and columns corresponding to boundary nodes
+        boundary_mask_rows = np.isin(K.indices, boundary_nodes)  # Mask for rows
+        boundary_mask_cols = np.isin(K.indices, boundary_nodes)  # Mask for columns
+
+        # Step 3: Set corresponding rows and columns to zero (except diagonal)
+        K.data[boundary_mask_rows | boundary_mask_cols] = 0  # Set non-diagonal elements to 0
+
+        # Step 4: Set diagonal entries corresponding to boundary nodes to 1
+        # First, create an array of the indices of the diagonal elements
+        row_indices = np.repeat(np.arange(K.shape[0]),
+                         np.diff(K.indptr))  # Repeat each row index based on the count of non-zeros in that row
+        col_indices = K.indices
+        diag_mask = (row_indices == col_indices) & np.isin(row_indices, boundary_nodes)
+
+        # Apply the mask to set diagonal entries to 1
+        K.data[diag_mask] = 1
+        # Step 5: Modify the load vector entries corresponding to boundary nodes to the prescribed value
+        F[boundary_nodes] = value  # Direct assignment of the prescribed boundary value
         return K, F
 
-    def build_freespace_stiffness_poisson(self, mesh):
-        indices = np.arange(0,mesh.numel)
+    def build_freespace_stiffness_poisson(self, mesh, areas):
 
-        local_stiffnesses = self._compute_local_stiffnesses(mesh, indices).ravel()
+        local_stiffnesses = self._compute_local_stiffnesses(mesh, areas).ravel()
         i_idx = np.repeat(mesh.elements, 3, axis=1).ravel()
         j_idx = np.tile(mesh.elements, (1, 3)).ravel() # (M, 1, 3)
 
@@ -200,15 +218,8 @@ class Linear2DFunction:
         num_nodes = mesh.numnd
 
         # Evaluate the source function f at the node positions
-        f_values = f(nodes[:, 0], nodes[:, 1])  # Shape (num_nodes,)
+        f_values = f(nodes[:, 0].copy(), nodes[:, 1].copy())  # Shape (num_nodes,)
 
-        # Extract node coordinates for the elements
-        x1, y1 = nodes[elements[:, 0], 0], nodes[elements[:, 0], 1]
-        x2, y2 = nodes[elements[:, 1], 0], nodes[elements[:, 1], 1]
-        x3, y3 = nodes[elements[:, 2], 0], nodes[elements[:, 2], 1]
-
-        # Compute the area of each element using the determinant method (vectorized)
-        area = 0.5 * np.abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))  # Shape (num_elements,)
 
         # Compute the function values at the element nodes (vectorized)
         f_values_element = np.vstack([f_values[elements[:, 0]],
@@ -230,19 +241,19 @@ class Linear2DFunction:
             raise NotImplementedError
         return stiffness, load
 
+    def build_poisson_system(self, mesh, load_function, boundary_conditions):
+        indices = np.arange(0,mesh.numel)
+        areas = self._element_areas(mesh.vertices, indices)
+        free_stiffness =  self.build_freespace_stiffness_poisson(mesh,areas)
+        free_load = self.build_load_vector(mesh,areas, load_function)
+        A, f = self.apply_boundary_conditions(free_stiffness, free_load, mode = boundary_conditions)
+        return A, f
 
 
+def solve_system(A, f):
 
-
-def solve_system():
-    return
+    return sparse.linalg.cg(A,f)[0]
     
-def get_poisson_stiffness_matrix():
-    return
-    
-def get_poisson_functional():
-    return
-
 
 if __name__=='__main__':
 
@@ -250,14 +261,18 @@ if __name__=='__main__':
 
 
     a = 0
-    b = 1
+    b = 10
     c = 0
-    d = 1
-    nx = 10
-    ny = 10
+    d = 10
+    nx = 100
+    ny = 100
     mesh = Mesh(*mesh_rectangle([a,b,c,d], nx, ny))
-    mesh.visualise2D()
+    #mesh.visualise2D()
     basis = Basis(mesh,'linear')
-    A = basis.basis_function.build_stiffness_poisson(mesh)
+    system = basis.basis_function.build_poisson_system(mesh, np.sin, 'dirichlet')
+    result = solve_system(*system)
+
+    system = basis.basis_function.build_poisson_system(mesh, lambda x,y: np.sin(y)+np.cos(x)**2, 'dirichlet')
+    result = solve_system(*system)
 
     print('End of Code')
