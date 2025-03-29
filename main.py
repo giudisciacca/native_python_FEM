@@ -251,9 +251,14 @@ class Linear2DFunction:
 
 
 def solve_system(A, f):
-
     return sparse.linalg.cg(A,f)[0]
-    
+
+def analytical_solution_1x1_square(x,y):
+    return np.sin(np.pi * x) * np.sin(np.pi * y)
+
+
+def load_function_analytical(x,y):
+    return 2 * np.pi ** 2 * np.sin(np.pi * x) * np.sin(np.pi * y)
 
 if __name__=='__main__':
 
@@ -261,9 +266,9 @@ if __name__=='__main__':
 
 
     a = 0
-    b = 10
+    b = 1
     c = 0
-    d = 10
+    d = 1
     nx = 100
     ny = 100
     mesh = Mesh(*mesh_rectangle([a,b,c,d], nx, ny))
@@ -275,4 +280,7 @@ if __name__=='__main__':
     system = basis.basis_function.build_poisson_system(mesh, lambda x,y: np.sin(y)+np.cos(x)**2, 'dirichlet')
     result = solve_system(*system)
 
+    system = basis.basis_function.build_poisson_system(mesh, load_function_analytical, 'dirichlet')
+    result = solve_system(*system)
+    analytical_result = analytical_solution_1x1_square(mesh.nodes[:,0].copy(),mesh.nodes[:,1].copy()).reshape(100,100)
     print('End of Code')
