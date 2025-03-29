@@ -3,7 +3,7 @@ This file contains classes and functions for the validation of FEM solutions of 
 
 Author: Giuseppe Di Sciacca
 '''
-
+import numpy as np
 
 class ValidateAgainstAnalytical:
     def __init__(self):

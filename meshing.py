@@ -55,6 +55,7 @@ class Mesh:
         else:
             # Otherwise, just plot the nodes without coloring
             ax.scatter(self.nodes[:, 0], self.nodes[:, 1], color='black')
+            ax.scatter(self.nodes[self.boundary_nodes[:],0], self.nodes[self.boundary_nodes[:],1], color='yellow')
             ax.set_title('Mesh Visualisation')
 
             # Plot the mesh edges
@@ -94,16 +95,9 @@ class Mesh:
             np.column_stack([self.elements[:, [0, 1]], self.elements[:, [1, 2]], self.elements[:, [2, 0]]])
             .reshape(-1, 2), axis=1)
 
-        # Convert edges into a structured array to enable unique counting
         edges_tuple = np.ascontiguousarray(edges).view([('', edges.dtype)] * 2)
-
-        # Find unique edges and their counts
         unique_edges, counts = np.unique(edges_tuple, return_counts=True)
-
-        # Boundary edges are those that appear exactly once
         boundary_edges = unique_edges[counts == 1].view(edges.dtype).reshape(-1, 2)
-
-        # Extract unique boundary nodes
         boundary_nodes = np.unique(boundary_edges)
 
         return boundary_nodes.tolist()
@@ -122,11 +116,10 @@ class Mesh:
         num_old_nodes = self.numnd
         new_elements = []  # List to store refined elements
 
-        # Step 1: Identify which elements contain each new node
         for i, new_node in enumerate(new_nodes):
-            new_index = num_old_nodes + i  # Index of the new node
+            new_index = num_old_nodes + i
             for elem in self.elements:
-                verts = nodes[elem]  # Get the three vertices of the element
+                verts = nodes[elem]
 
                 # Compute barycentric coordinates
                 A = np.array([
@@ -137,7 +130,7 @@ class Mesh:
                 b = np.array([new_node[0], new_node[1], 1])
                 bary_coords = np.linalg.solve(A, b)
 
-                if np.all(bary_coords >= 0) and np.all(bary_coords <= 1):  # Inside triangle
+                if np.all(bary_coords >= 0) and np.all(bary_coords <= 1):
                     new_elements.append([elem[0], elem[1], new_index])
                     new_elements.append([elem[1], elem[2], new_index])
                     new_elements.append([elem[2], elem[0], new_index])
@@ -175,7 +168,7 @@ def mesh_rectangle(rectangle_params: list, num_elements_x: int, num_elements_y: 
     x = np.linspace(a, b, num_elements_x, endpoint=True)
     y = np.linspace(c, d, num_elements_y, endpoint=True)
     nodes = np.hstack([mg.reshape(-1, 1) for mg in np.meshgrid(x, y)])
-    elements = find_triangular_elements_in_rect_domain([num_elements_x, num_elements_y])
+    elements = find_triangular_elements_in_rect_domain([num_elements_y, num_elements_x])
     return nodes, elements
 
 
