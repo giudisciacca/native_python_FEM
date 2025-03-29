@@ -161,7 +161,7 @@ class Linear2DFunction:
 
     def build_load_vector(self, mesh: 'Mesh', areas: np.ndarray, f: callable) -> np.ndarray:
         """
-        Build the load vector for the Poisson equation - div u = f using the finite element method.
+        Build the load vector for the Poisson equation - div u = f for the finite element method with midpoint approximation.
 
         Args:
             mesh (Mesh): The mesh object containing the nodes and elements.
@@ -175,12 +175,17 @@ class Linear2DFunction:
         elements = mesh.elements.copy()
         num_nodes = mesh.numnd
 
-        f_values = f(nodes[:, 0], nodes[:, 1])
+        midpoints_x = (nodes[elements[:, 0], 0] + nodes[elements[:, 1], 0] + nodes[elements[:, 2], 0]) / 3
+        midpoints_y = (nodes[elements[:, 0], 1] + nodes[elements[:, 1], 1] + nodes[elements[:, 2], 1]) / 3
+
+
+        f_midpoints = f(midpoints_x, midpoints_y)
 
         load_vector = np.zeros(num_nodes)
-        np.add.at(load_vector, elements[:, 0], (1/3)*f_values[elements[:, 0]] * areas)
-        np.add.at(load_vector, elements[:, 1], (1/3)*f_values[elements[:, 1]] * areas)
-        np.add.at(load_vector, elements[:, 2], (1/3)*f_values[elements[:, 2]] * areas)
+
+        np.add.at(load_vector, elements[:, 0], f_midpoints * areas / 3)
+        np.add.at(load_vector, elements[:, 1], f_midpoints * areas / 3)
+        np.add.at(load_vector, elements[:, 2], f_midpoints * areas / 3)
 
         return load_vector
 
