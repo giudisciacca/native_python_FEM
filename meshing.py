@@ -102,44 +102,78 @@ class Mesh:
 
         return boundary_nodes.tolist()
 
-    def refine_mesh(self, new_nodes: np.ndarray) -> 'Mesh':
-        """
-        Refines the mesh by adding new nodes and updating the element connectivity.
-
+    def _circum_incircle_ratio(self, nodes: np.ndarray, selected_elements: np.ndarray)->np.ndarray:
+        """Compute the ratio of circumcircle radius to incircle radius for a given triangle.
         Args:
-            new_nodes (np.ndarray): Array of new node coordinates to be added to the mesh.
+            nodes (np.array): nodes of the mesh
+            selected_elements (np.ndarray): Indices of elements to be split.
 
         Returns:
-            Mesh: A new Mesh object with refined nodes and elements.
+            np.array containing the ratios of circumradii and inradii of the selected elements
         """
-        nodes = np.vstack((self.nodes, new_nodes))  # Append new nodes to the existing list
+        A, B, C = nodes[selected_elements[:,0]],nodes[selected_elements[:,1]],nodes[selected_elements[:,2]]
+        a, b, c = np.linalg.norm(B - C, axis = 1), np.linalg.norm(A - C, axis = 1), np.linalg.norm(A - B, axis = 1)
+        s = (a + b + c) / 2
+        inradius = np.sqrt((s - a) * (s - b) * (s - c) / s)
+        circumradius = (a * b * c) / (4 * inradius * s)
+        return circumradius / inradius
+
+    def _edges_midpoint(self, nodes: np.ndarray, selected_elements: np.ndarray)->np.ndarray:
+        """Compute the incentre for a given set of triangles identified by mesh nodes and selected elements.
+        Args:
+            nodes (np.array): nodes of the mesh
+            selected_elements (np.ndarray): Indices of elements to be split.
+
+        Returns:
+            np.array containing incentre of the selected elements
+        """
+        A, B, C = nodes[selected_elements[:,0]],nodes[selected_elements[:,1]],nodes[selected_elements[:,2]]
+        edges_mid = np.vstack([0.5 * (A + B), 0.5 * (A + C), 0.5 * (B + C)])
+        return edges_mid
+
+    def refine_mesh(self, elements_to_split: np.ndarray, tol = 1e-6) -> 'Mesh':
+        """
+        Refine specified elements by adding a new node at the centroid and splitting each triangle into three.
+        Ensures the circumcircle-to-incircle ratio remains constant.
+
+        Args:
+            elements_to_split (np.ndarray): Indices of elements to be split.
+            tol (float, optional): tolerance for the new ratio of incirce and circumcircle radii
+
+        Returns:
+            Mesh: A new refined Mesh instance.
+        """
+        nodes = self.nodes.copy()
         num_old_nodes = self.numnd
-        new_elements = []  # List to store refined elements
+        if elements_to_split.ndim == 1:
+            elements_to_split = elements_to_split.reshape((1,-1))
+        selected_ratios = self._circum_incircle_ratio(nodes,elements_to_split)
 
-        for i, new_node in enumerate(new_nodes):
-            new_index = num_old_nodes + i
-            for elem in self.elements:
-                verts = nodes[elem]
+        new_nodes = self._edges_midpoint(nodes, elements_to_split)
+        nodes = np.vstack([nodes, new_nodes])
+        new_indices = num_old_nodes + np.arange(0,len(new_nodes))
 
-                # Compute barycentric coordinates
-                A = np.array([
-                    [verts[0, 0], verts[1, 0], verts[2, 0]],
-                    [verts[0, 1], verts[1, 1], verts[2, 1]],
-                    [1, 1, 1]
-                ])
-                b = np.array([new_node[0], new_node[1], 1])
-                bary_coords = np.linalg.solve(A, b)
+        new_elements = np.column_stack([
+            elements_to_split[:, 0], new_indices[0::3], new_indices[1::3],  # First triangle
+            elements_to_split[:, 1], new_indices[2::3], new_indices[0::3],  # Second triangle
+            elements_to_split[:, 2], new_indices[1::3], new_indices[2::3],  # Third triangle
+            new_indices[0::3], new_indices[1::3], new_indices[2::3]  # Center triangle
+        ]).reshape(-1, 3)
 
-                if np.all(bary_coords >= 0) and np.all(bary_coords <= 1):
-                    new_elements.append([elem[0], elem[1], new_index])
-                    new_elements.append([elem[1], elem[2], new_index])
-                    new_elements.append([elem[2], elem[0], new_index])
-                else:
-                    new_elements.append(elem)  # Keep original element
+        updated_ratios = self._circum_incircle_ratio(nodes, new_elements)
+        augmented_ratios = np.repeat(selected_ratios, 4)
 
-        self.__init__(nodes, np.array(new_elements))
-        return self
+        # check that the ratio is kept constant
+        idxs = np.abs( (augmented_ratios - updated_ratios)/updated_ratios)>tol
+        if np.sum(idxs)>0:
+            raise ValueError('A number of {} elements did not satisfy convergence theory'.format(np.sum(idxs)))
 
+        # remove selected elements
+        self.elements = np.delete(self.elements, np.where(np.isin(self.elements, elements_to_split).all(axis=1))[0],
+                                  axis=0)
+        elements = np.vstack([self.elements, new_elements])  # Add the new elements to the mesh
+
+        return Mesh(nodes, elements)
 
 
 def mesh_rectangle(rectangle_params: list, num_elements_x: int, num_elements_y: int) -> tuple:

@@ -70,7 +70,6 @@ if __name__=='__main__':
         l2error.append(  np.sqrt((1/mesh.numnd)*np.sum( (analytical_result - fem_result )**2 )))
         node_numbers.append(mesh.numnd)
 
-
     plt.figure()
     plt.loglog(node_numbers, l2error)
     plt.title('Mean L2 error w.r.t. nodes number')
@@ -79,7 +78,26 @@ if __name__=='__main__':
     plt.grid(True)
     plt.show(block=False)
 
-    # test 6: add points
+    # test 6: split element
+    a = 0
+    b = 1
+    c = 0
+    d = 1
+    nx = 10
+    ny = 10
+    mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
+    mesh.visualise2D()
+    mesh.refine_mesh(mesh.elements[40,:])
 
-
+    # test 7: split many elements
+    a = 0
+    b = 1
+    c = 0
+    d = 1
+    nx = 10
+    ny = 10
+    mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
+    mesh.visualise2D()
+    mesh.refine_mesh(mesh.elements[40:50, :])
+    mesh.visualise2D()
     print('End of Code')
