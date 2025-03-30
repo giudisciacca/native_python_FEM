@@ -1,6 +1,11 @@
 # native python FEM
 Set of code for the implementation of FEM on python native libraries
 
+Requirements are:
+numpy
+scipy
+matplotlib
+
 The code leverages the fast meshing of domains that can result under 
 the assumption of well-behaved rectangular domain
 
@@ -18,4 +23,5 @@ Timing assessment has not been provided due to the constraints on the allowed li
 
 Future work should move towards meshing for any domain and towards the solution of other PDE,
 starting from parabolic equations and anisotropic diffusion.
+
 
