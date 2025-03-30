@@ -8,18 +8,16 @@ import numpy as np
 from scipy import sparse
 
 class Basis:
-    def __init__(self, mesh: 'Mesh', mode: str):
+    def __init__(self, mode: str):
         """
         Initialize a Basis function for finite element analysis.
 
         Args:
-            mesh (Mesh): The mesh object containing the nodes and elements.
             mode (str): The type of basis function to use. Currently supports 'linear'.
 
         Raises:
             NotImplementedError: If an unsupported mode is specified.
         """
-        self.mesh = mesh
         if mode == 'linear':
             self.basis_function = self.linear()
         else:

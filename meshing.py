@@ -7,6 +7,8 @@ import numpy as np
 from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 import matplotlib
+from sympy.codegen.fnodes import elemental
+
 matplotlib.use('TkAgg')
 
 
@@ -128,7 +130,7 @@ class Mesh:
             np.array containing incentre of the selected elements
         """
         A, B, C = nodes[selected_elements[:,0]],nodes[selected_elements[:,1]],nodes[selected_elements[:,2]]
-        edges_mid = np.vstack([0.5 * (A + B), 0.5 * (A + C), 0.5 * (B + C)])
+        edges_mid = np.hstack([0.5 * (A + B), 0.5 * (A + C), 0.5 * (B + C)]).reshape(-1,2)
         return edges_mid
 
     def refine_mesh(self, elements_to_split: np.ndarray, tol = 1e-6) -> 'Mesh':
@@ -144,6 +146,7 @@ class Mesh:
             Mesh: A new refined Mesh instance.
         """
         nodes = self.nodes.copy()
+        elements = self.elements.copy()
         num_old_nodes = self.numnd
         if elements_to_split.ndim == 1:
             elements_to_split = elements_to_split.reshape((1,-1))
@@ -169,9 +172,9 @@ class Mesh:
             raise ValueError('A number of {} elements did not satisfy convergence theory'.format(np.sum(idxs)))
 
         # remove selected elements
-        self.elements = np.delete(self.elements, np.where(np.isin(self.elements, elements_to_split).all(axis=1))[0],
+        elements = np.delete(elements, np.where(np.isin(elements, elements_to_split).all(axis=1))[0],
                                   axis=0)
-        elements = np.vstack([self.elements, new_elements])  # Add the new elements to the mesh
+        elements = np.vstack([elements, new_elements])  # Add the new elements to the mesh
 
         return Mesh(nodes, elements)
 

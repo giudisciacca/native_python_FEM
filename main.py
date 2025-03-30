@@ -47,7 +47,7 @@ if __name__=='__main__':
     nx = 100
     ny = 100
     mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
-    basis = Basis(mesh,'linear')
+    basis = Basis('linear')
     system = basis.basis_function.build_poisson_system(mesh, np.sin, 'dirichlet')
     result = solve_system(*system)
     mesh.visualise2D(result)
@@ -63,7 +63,7 @@ if __name__=='__main__':
     for i in range(1,5):
         side_size = side_size*2
         mesh = Mesh(*mesh_rectangle([a, b, c, d], side_size, side_size))
-        basis = Basis(mesh, 'linear')
+        basis = Basis('linear')
         system = basis.basis_function.build_poisson_system(mesh, ValidateAgainstAnalytical().load_function_analytical, 'dirichlet')
         fem_result = solve_system(*system)
         analytical_result = ValidateAgainstAnalytical().analytical_solution_1x1_square(mesh.nodes[:,0].copy(),mesh.nodes[:,1].copy())
@@ -87,8 +87,8 @@ if __name__=='__main__':
     ny = 10
     mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
     mesh.visualise2D()
-    mesh.refine_mesh(mesh.elements[40,:])
-
+    refined_mesh = mesh.refine_mesh(mesh.elements[40,:])
+    refined_mesh.visualise2D()
     # test 7: split many elements
     a = 0
     b = 1
@@ -97,7 +97,14 @@ if __name__=='__main__':
     nx = 10
     ny = 10
     mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
+    refined_mesh = mesh.refine_mesh(mesh.elements[40:50, :])
     mesh.visualise2D()
-    mesh.refine_mesh(mesh.elements[40:50, :])
-    mesh.visualise2D()
+    refined_mesh.visualise2D()
+
+    # test 8: check solution on refined mesh
+    basis = Basis( 'linear')
+    system = basis.basis_function.build_poisson_system(refined_mesh, np.sin, 'dirichlet')
+    result = solve_system(*system)
+    refined_mesh.visualise2D(result)
+
     print('End of Code')
