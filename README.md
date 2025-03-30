@@ -5,6 +5,7 @@ Requirements are:
 numpy
 scipy
 matplotlib
+(jupyter)
 
 The code leverages the fast meshing of domains that can result under 
 the assumption of well-behaved rectangular domain
