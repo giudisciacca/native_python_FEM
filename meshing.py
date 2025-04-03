@@ -176,7 +176,17 @@ class Mesh:
                                   axis=0)
         elements = np.vstack([elements, new_elements])  # Add the new elements to the mesh
 
-        return Mesh(nodes, elements)
+        # remove duplicate nodes and update elements
+        diff_matrix = np.sum(((nodes[:, np.newaxis] - nodes) ** 2), axis=2) == 0
+        zero_indices = np.argwhere(np.triu(diff_matrix, k=0) == 1)
+        zero_duplicates = np.argwhere(np.sum(np.triu(diff_matrix, k=0), axis=0) > 1)
+        unique_zeros = zero_indices[np.isin(zero_indices[:, 0], np.where(zero_duplicates)[0], invert=True)]
+        node_map = dict(zip(unique_zeros[:, 1], unique_zeros[:, 0]))
+        elements = np.vectorize(lambda x: node_map.get(x, x))(elements)
+
+        unique_nodes, unique_node_indices = np.unique(nodes, axis=0, return_inverse=True)
+        elements = unique_node_indices[elements]
+        return Mesh(unique_nodes, elements)
 
 
 def mesh_rectangle(rectangle_params: list, num_elements_x: int, num_elements_y: int) -> tuple:

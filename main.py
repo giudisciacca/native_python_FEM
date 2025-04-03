@@ -89,7 +89,8 @@ if __name__=='__main__':
     mesh.visualise2D()
     refined_mesh = mesh.refine_mesh(mesh.elements[40,:])
     refined_mesh.visualise2D()
-    # test 7: split many elements
+
+    # test 7: split many elements (boundary elements identified in new elements)
     a = 0
     b = 1
     c = 0
@@ -103,6 +104,24 @@ if __name__=='__main__':
 
     # test 8: check solution on refined mesh
     basis = Basis( 'linear')
+    system = basis.basis_function.build_poisson_system(refined_mesh, np.sin, 'dirichlet')
+    result = solve_system(*system)
+    refined_mesh.visualise2D(result)
+
+    # test 9: split all elements (boundary should be where expected )
+    a = 0
+    b = 1
+    c = 0
+    d = 1
+    nx = 20
+    ny = 20
+    mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
+    refined_mesh = mesh.refine_mesh(mesh.elements)
+    mesh.visualise2D()
+    refined_mesh.visualise2D()
+
+    # test 10: check solution on refined mesh
+    basis = Basis('linear')
     system = basis.basis_function.build_poisson_system(refined_mesh, np.sin, 'dirichlet')
     result = solve_system(*system)
     refined_mesh.visualise2D(result)
