@@ -113,8 +113,8 @@ if __name__=='__main__':
     b = 1
     c = 0
     d = 1
-    nx = 20
-    ny = 20
+    nx = 12
+    ny = 12
     mesh = Mesh(*mesh_rectangle([a, b, c, d], nx, ny))
     refined_mesh = mesh.refine_mesh(mesh.elements)
     mesh.visualise2D()
